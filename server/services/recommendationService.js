@@ -4,40 +4,42 @@ const { ConversationChain } = require('langchain/chains');
 const { ChatPromptTemplate } = require('langchain/prompts');
 
 const uri = 'mongodb://localhost:27017';
-const client = new MongoClient(uri);
 const dbName = 'investmentDB';
-const collectionName = 'investmentData';
+const client = new MongoClient(uri);
 
-const openai = new OpenAI({
-  openAIApiKey: process.env.OPENAI_API_KEY,
-});
-
-const recommendationChain = new ConversationChain({
-  llm: openai,
-  prompt: ChatPromptTemplate.fromTemplate('Based on the following data: {data}, what investment recommendations can you provide?'),
-});
+async function connectToDatabase() {
+    try {
+        await client.connect();
+        console.log('Connected to database');
+        return client.db(dbName);
+    } catch (error) {
+        console.error('Database connection error:', error);
+        throw new Error('Database connection failed');
+    }
+}
 
 async function getInvestmentRecommendations(userInput) {
-  try {
-    await client.connect();
-    const database = client.db(dbName);
-    const collection = database.collection(collectionName);
+    const db = await connectToDatabase();
+    const recommendationsCollection = db.collection('recommendations');
 
-    const investmentData = await collection.find({}).toArray();
-    if (!investmentData.length) {
-      throw new Error('No investment data found');
+    const model = new OpenAI({ temperature: 0.7 });
+    const prompt = ChatPromptTemplate.fromTemplate('Based on the following user input: {input}, provide investment recommendations.');
+    const chain = new ConversationChain({ llm: model, prompt });
+
+    try {
+        const response = await chain.call({ input: userInput });
+        const recommendations = response.text;
+
+        await recommendationsCollection.insertOne({ userInput, recommendations });
+        return recommendations;
+    } catch (error) {
+        console.error('Error generating recommendations:', error);
+        throw new Error('Failed to generate recommendations');
+    } finally {
+        await client.close();
     }
-
-    const recommendations = await recommendationChain.call({ data: JSON.stringify(investmentData) });
-    return recommendations;
-  } catch (error) {
-    console.error('Error getting investment recommendations:', error);
-    throw new Error('Failed to get investment recommendations');
-  } finally {
-    await client.close();
-  }
 }
 
 module.exports = {
-  getInvestmentRecommendations,
+    getInvestmentRecommendations,
 };
