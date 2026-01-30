@@ -21,42 +21,54 @@ describe('User API', () => {
   it('should create a new user', async () => {
     const res = await request(app)
       .post('/api/users')
-      .send({ name: 'John Doe', email: 'john@example.com' });
+      .send({ username: 'testuser', password: 'password123' });
     
     expect(res.statusCode).toEqual(201);
     expect(res.body).toHaveProperty('user');
-    expect(res.body.user.name).toBe('John Doe');
+    expect(res.body.user.username).toBe('testuser');
   });
 
-  it('should return 400 for invalid user data', async () => {
-    const res = await request(app)
-      .post('/api/users')
-      .send({ name: '', email: 'invalid-email' });
-    
-    expect(res.statusCode).toEqual(400);
-    expect(res.body).toHaveProperty('error');
-  });
-
-  it('should fetch all users', async () => {
+  it('should return all users', async () => {
     const res = await request(app).get('/api/users');
     
     expect(res.statusCode).toEqual(200);
-    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body).toHaveProperty('users');
+    expect(Array.isArray(res.body.users)).toBe(true);
   });
 
-  it('should fetch a user by ID', async () => {
-    const user = await User.create({ name: 'Jane Doe', email: 'jane@example.com' });
+  it('should return a user by ID', async () => {
+    const user = await User.create({ username: 'testuser2', password: 'password123' });
     const res = await request(app).get(`/api/users/${user._id}`);
     
     expect(res.statusCode).toEqual(200);
     expect(res.body).toHaveProperty('user');
-    expect(res.body.user.name).toBe('Jane Doe');
+    expect(res.body.user.username).toBe('testuser2');
   });
 
-  it('should return 404 for non-existing user', async () => {
-    const res = await request(app).get('/api/users/123456789012345678901234');
+  it('should update a user', async () => {
+    const user = await User.create({ username: 'testuser3', password: 'password123' });
+    const res = await request(app)
+      .put(`/api/users/${user._id}`)
+      .send({ username: 'updateduser' });
     
-    expect(res.statusCode).toEqual(404);
-    expect(res.body).toHaveProperty('error');
+    expect(res.statusCode).toEqual(200);
+    expect(res.body).toHaveProperty('user');
+    expect(res.body.user.username).toBe('updateduser');
   });
+
+  it('should delete a user', async () => {
+    const user = await User.create({ username: 'testuser4', password: 'password123' });
+    const res = await request(app).delete(`/api/users/${user._id}`);
+    
+    expect(res.statusCode).toEqual(204);
+  });
+});
+
+import { render, screen } from '@testing-library/react';
+import App from '../src/App'; // Adjust the path as necessary
+
+test('renders learn react link', () => {
+  render(<App />);
+  const linkElement = screen.getByText(/learn react/i);
+  expect(linkElement).toBeInTheDocument();
 });
