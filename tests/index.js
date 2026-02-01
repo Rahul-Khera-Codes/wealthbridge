@@ -1,66 +1,33 @@
 import request from 'supertest';
 import app from '../src/app'; // Adjust the path as necessary
 import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
-import User from '../src/models/User'; // Adjust the path as necessary
 
-let mongoServer;
-
-beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
-  const uri = mongoServer.getUri();
-  await mongoose.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true });
-});
-
-afterAll(async () => {
-  await mongoose.disconnect();
-  await mongoServer.stop();
-});
-
-describe('User API', () => {
-  it('should create a new user', async () => {
-    const res = await request(app)
-      .post('/api/users')
-      .send({ username: 'testuser', password: 'password123' });
-    
-    expect(res.statusCode).toEqual(201);
-    expect(res.body).toHaveProperty('user');
-    expect(res.body.user.username).toBe('testuser');
+describe('API Tests', () => {
+  beforeAll(async () => {
+    const uri = 'mongodb://localhost:27017/testdb'; // Use your test database URI
+    await mongoose.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true });
   });
 
-  it('should return all users', async () => {
-    const res = await request(app).get('/api/users');
-    
-    expect(res.statusCode).toEqual(200);
-    expect(res.body).toHaveProperty('users');
-    expect(Array.isArray(res.body.users)).toBe(true);
+  afterAll(async () => {
+    await mongoose.connection.close();
   });
 
-  it('should return a user by ID', async () => {
-    const user = await User.create({ username: 'testuser2', password: 'password123' });
-    const res = await request(app).get(`/api/users/${user._id}`);
-    
-    expect(res.statusCode).toEqual(200);
-    expect(res.body).toHaveProperty('user');
-    expect(res.body.user.username).toBe('testuser2');
+  it('should return 200 for GET /api/items', async () => {
+    const response = await request(app).get('/api/items');
+    expect(response.status).toBe(200);
+    expect(Array.isArray(response.body)).toBe(true);
   });
 
-  it('should update a user', async () => {
-    const user = await User.create({ username: 'testuser3', password: 'password123' });
-    const res = await request(app)
-      .put(`/api/users/${user._id}`)
-      .send({ username: 'updateduser' });
-    
-    expect(res.statusCode).toEqual(200);
-    expect(res.body).toHaveProperty('user');
-    expect(res.body.user.username).toBe('updateduser');
+  it('should create a new item with POST /api/items', async () => {
+    const newItem = { name: 'Test Item', description: 'This is a test item.' };
+    const response = await request(app).post('/api/items').send(newItem);
+    expect(response.status).toBe(201);
+    expect(response.body.name).toBe(newItem.name);
   });
 
-  it('should delete a user', async () => {
-    const user = await User.create({ username: 'testuser4', password: 'password123' });
-    const res = await request(app).delete(`/api/users/${user._id}`);
-    
-    expect(res.statusCode).toEqual(204);
+  it('should return 404 for non-existing route', async () => {
+    const response = await request(app).get('/api/non-existing-route');
+    expect(response.status).toBe(404);
   });
 });
 
@@ -71,4 +38,28 @@ test('renders learn react link', () => {
   render(<App />);
   const linkElement = screen.getByText(/learn react/i);
   expect(linkElement).toBeInTheDocument();
+});
+
+import { ChatOpenAI } from 'langchain/chat_models/openai';
+import { OpenAIEmbeddings } from 'langchain/embeddings/openai';
+import { PineconeStore } from 'langchain/vectorstores/pinecone';
+
+describe('LangChain Tests', () => {
+  it('should initialize ChatOpenAI correctly', () => {
+    const chatModel = new ChatOpenAI({ temperature: 0 });
+    expect(chatModel).toBeDefined();
+  });
+
+  it('should create embeddings with OpenAIEmbeddings', async () => {
+    const embeddings = new OpenAIEmbeddings();
+    const result = await embeddings.embedQuery('Test query');
+    expect(result).toBeDefined();
+  });
+
+  it('should store vectors in PineconeStore', async () => {
+    const store = new PineconeStore({ apiKey: 'your-pinecone-api-key' });
+    await store.addVectors([{ id: '1', values: [0.1, 0.2, 0.3] }]);
+    const vectors = await store.getVectors(['1']);
+    expect(vectors.length).toBe(1);
+  });
 });
